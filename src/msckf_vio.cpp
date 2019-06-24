@@ -50,6 +50,38 @@ Feature::OptimizationConfig Feature::optimization_config;
 
 map<int, double> MsckfVio::chi_squared_test_table;
 
+#if 1
+static const int p_max_cnt = 10000;
+static const int p_cols = 18;
+static double *p_log_data = new double[p_max_cnt * p_cols];
+static int p_cnt = 0;
+void mylog()
+{
+    FILE* fp = fopen("vio.txt","w");
+    int k = 0;
+    while(1)
+    {
+        if(k < p_cnt)
+        {
+            for(int i=0; i<p_cols; i++)
+            {
+                if(i > 0) fprintf(fp, " ");
+                fprintf(fp, "%f", p_log_data[p_cols * k + i]);
+            }
+            fprintf(fp, "\n");
+            fflush(fp);
+            k++;
+        }
+        else
+        {
+            usleep(100000);
+        }
+    }
+    fclose(fp);
+}
+static std::thread th_log(mylog);
+#endif
+
 MsckfVio::MsckfVio(ros::NodeHandle& pnh):
   is_gravity_set(false),
   is_first_img(true),
@@ -435,6 +467,34 @@ void MsckfVio::featureCallback(
     //printf("Publish time: %f/%f\n",
     //    publish_time, publish_time/processing_time);
   }
+#if 1
+    const auto& s = state_server.imu_state;
+    const auto& p = s.position;
+    const auto& q = s.orientation;
+    const auto& v = s.velocity;
+    const auto& ba = s.acc_bias;
+    const auto& bg = s.gyro_bias;
+    double *lp = p_log_data + p_cnt * p_cols;
+    lp[0] = s.time;
+    lp[1] = p(0);
+    lp[2] = p(1);
+    lp[3] = p(2);
+    lp[4] = q.w();
+    lp[5] = q.x();
+    lp[6] = q.y();
+    lp[7] = q.z();
+    lp[8] = v(0);
+    lp[9] = v(1);
+    lp[10] = v(2);
+    lp[11] = ba(0);
+    lp[12] = ba(1);
+    lp[13] = ba(2);
+    lp[14] = bg(0);
+    lp[15] = bg(1);
+    lp[16] = bg(2);
+    lp[17] = processing_time;
+    p_cnt++;
+#endif
 
   return;
 }
